@@ -47,153 +47,166 @@ public class PlaytimeRewardsGui extends Gui {
             PlaytimeTracker playtimeTracker = ((PlaytimeTrackerModule) playtimeTrackerModule).getPlaytimeTracker(player.getUniqueId());
 
             module.getOrLoadUserData(player.getUniqueId(), true)
-                .completeOnTimeout(null, 15, TimeUnit.SECONDS)
-                .thenAccept(userData -> LushRewards.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> {
-                    if (userData == null) {
-                        DisplayItemStack errorItem = DisplayItemStack.builder(Material.BARRIER)
-                            .setDisplayName("&#ff6969Failed to load rewards user data try relogging")
-                            .setLore(List.of("&7&oIf this continues please", "&7&oreport to your server administrator"))
-                            .build();
+                    .completeOnTimeout(null, 15, TimeUnit.SECONDS)
+                    .thenAccept(userData -> LushRewards.getMorePaperLib().scheduling().globalRegionalScheduler().run(() -> {
+                        if (userData == null) {
+                            DisplayItemStack errorItem = DisplayItemStack.builder(Material.BARRIER)
+                                    .setDisplayName("&#ff6969Failed to load rewards user data try relogging")
+                                    .setLore(List.of("&7&oIf this continues please", "&7&oreport to your server administrator"))
+                                    .build();
 
-                        inventory.setItem(4, errorItem.asItemStack(player, true));
+                            inventory.setItem(4, errorItem.asItemStack(player, true));
 
-                        return;
-                    }
-
-                    int playtime = playtimeTracker.getGlobalPlaytime() - userData.getPreviousDayEndPlaytime();
-                    int lastCollectedPlaytime = userData.getLastCollectedPlaytime() - userData.getPreviousDayEndPlaytime();
-                    Integer shortestFrequency = module.getShortestRepeatFrequency(playtime);
-                    int startPlaytime;
-                    switch (module.getScrollType()) {
-                        case SCROLL -> {
-                            if (shortestFrequency != null) {
-                                startPlaytime = Math.max((int) (playtime - (shortestFrequency * Math.floor(guiTemplate.countChar('R') / 2D))), lastCollectedPlaytime);
-                            } else {
-                                startPlaytime = lastCollectedPlaytime;
-                            }
+                            return;
                         }
-                        default -> startPlaytime = 0;
-                    }
 
-                    module.getRewards().forEach(reward -> {
-                        if (!reward.shouldHideFromGui()) {
-                            Integer minutes = MathUtils.findFirstNumInSequence(reward.getStartMinute(), reward.getRepeatFrequency(), startPlaytime);
-                            if (minutes != null) {
-                                rewardQueue.add(new Pair<>(reward, minutes));
-                            }
-                        }
-                    });
-
-                    TreeMultimap<Character, Integer> slotMap = guiTemplate.getSlotMap();
-                    for (Character character : slotMap.keySet()) {
-                        switch (character) {
-                            case 'A' -> slotMap.get(character).forEach(slot -> {
-                                DisplayItemStack displayItem = LushRewards.getInstance().getConfigManager().getItemTemplate("claim-all", module);
-                                if (module.hasClaimableRewards(player)) {
-                                    displayItem = DisplayItemStack.builder(displayItem)
-                                        .setEnchantGlow(true)
-                                        .build();
-                                }
-
-                                inventory.setItem(slot, displayItem.asItemStack(player, true));
-
-                                addButton(slot, event -> {
-                                    removeButton(slot);
-
-                                    if (module.hasClaimableRewards(player)) {
-                                        module.claimRewards(player);
-                                    }
-                                });
-                            });
-                            case 'R' -> slotMap.get(character).forEach(slot -> {
-                                if (rewardQueue.isEmpty()) {
-                                    return;
-                                }
-
-                                Pair<PlaytimeRewardCollection, Integer> rewardPair = rewardQueue.poll();
-                                PlaytimeRewardCollection reward = rewardPair.first();
-                                int minutes = rewardPair.second();
-                                int nextMinute = minutes + reward.getRepeatFrequency();
-
-                                if (reward.getRepeatFrequency() > 0 && nextMinute <= reward.getRepeatsUntil()) {
-                                    rewardQueue.add(new Pair<>(reward, nextMinute));
-                                }
-
-                                String itemTemplate;
-                                if (minutes < lastCollectedPlaytime) {
-                                    itemTemplate = "collected-reward";
-                                } else if (playtime > minutes) {
-                                    itemTemplate = "redeemable-reward";
+                        int playtime = playtimeTracker.getGlobalPlaytime() - userData.getPreviousDayEndPlaytime();
+                        int lastCollectedPlaytime = userData.getLastCollectedPlaytime() - userData.getPreviousDayEndPlaytime();
+                        Integer shortestFrequency = module.getShortestRepeatFrequency(playtime);
+                        int startPlaytime;
+                        switch (module.getScrollType()) {
+                            case SCROLL -> {
+                                if (shortestFrequency != null) {
+                                    startPlaytime = Math.max((int) (playtime - (shortestFrequency * Math.floor(guiTemplate.countChar('R') / 2D))), lastCollectedPlaytime);
                                 } else {
-                                    itemTemplate = "default-reward";
+                                    startPlaytime = lastCollectedPlaytime;
                                 }
+                            }
+                            default -> startPlaytime = 0;
+                        }
 
-                                DisplayItemStack.Builder displayItemBuilder = DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getCategoryTemplate(reward.getCategory()))
-                                    .overwrite(DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getItemTemplate(itemTemplate, module)))
-                                    .overwrite(DisplayItemStack.builder(reward.getDisplayItem()));
-
-                                if (displayItemBuilder.getDisplayName() != null) {
-                                    displayItemBuilder.setDisplayName(displayItemBuilder.getDisplayName()
-                                        .replace("%minutes%", String.valueOf(minutes)));
+                        module.getRewards().forEach(reward -> {
+                            if (!reward.shouldHideFromGui()) {
+                                Integer minutes = MathUtils.findFirstNumInSequence(reward.getStartMinute(), reward.getRepeatFrequency(), startPlaytime);
+                                if (minutes != null) {
+                                    rewardQueue.add(new Pair<>(reward, minutes));
                                 }
+                            }
+                        });
 
-                                if (displayItemBuilder.hasLore()) {
-                                    displayItemBuilder.setLore(displayItemBuilder.getLore().stream().map(line ->
-                                        line.replace("%minutes%", String.valueOf(minutes))
-                                    ).toList());
-                                }
+                        TreeMultimap<Character, Integer> slotMap = guiTemplate.getSlotMap();
+                        for (Character character : slotMap.keySet()) {
+                            switch (character) {
+                                case 'A' -> slotMap.get(character).forEach(slot -> {
+                                    DisplayItemStack displayItem = LushRewards.getInstance().getConfigManager().getItemTemplate("claim-all", module);
+                                    if (module.hasClaimableRewards(player)) {
+                                        displayItem = DisplayItemStack.builder(displayItem)
+                                                .setEnchantGlow(true)
+                                                .build();
+                                    }
 
-                                displayItemBuilder.parseColors(player);
+                                    inventory.setItem(slot, displayItem.asItemStack(player, true));
 
-                                if (module.hasClaimableRewards(player, playtimeTracker.getGlobalPlaytime())) {
-                                    addButton(slot, (event) -> {
-                                        // Gets clicked item and checks if it exists
-                                        ItemStack currItem = event.getCurrentItem();
-                                        if (currItem == null) {
-                                            return;
-                                        }
-
+                                    addButton(slot, event -> {
                                         removeButton(slot);
 
-                                        DisplayItemStack.Builder collectedItemBuilder = DisplayItemStack.builder(currItem)
-                                            .overwrite(DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getItemTemplate("collected-reward", module)));
-
-                                        if (collectedItemBuilder.getDisplayName() != null) {
-                                            collectedItemBuilder.setDisplayName(collectedItemBuilder.getDisplayName()
-                                                .replace("%minutes%", String.valueOf(minutes)));
+                                        if (module.hasClaimableRewards(player)) {
+                                            module.claimRewards(player);
                                         }
-
-                                        inventory.setItem(slot, collectedItemBuilder.build().asItemStack(player, true));
-
-                                        Debugger.sendDebugMessage("Starting reward process for " + player.getName(), Debugger.DebugMode.ALL);
-                                        if (module.hasClaimableRewards(player, playtimeTracker.getGlobalPlaytime())) {
-                                            module.claimRewards(player, playtimeTracker.getGlobalPlaytime());
-                                        }
-
-                                        refresh();
                                     });
-                                }
+                                });
+                                case 'M' -> slotMap.get(character).forEach(slot -> {
+                                    // 创建显示物品
+                                    DisplayItemStack item = LushRewards.getInstance().getConfigManager().getItemTemplate(String.valueOf(character), module);
 
-                                inventory.setItem(slot, displayItemBuilder.build().asItemStack(player, true));
-                            });
-                            case ' ' ->
-                                slotMap.get(character).forEach(slot -> inventory.setItem(slot, new ItemStack(Material.AIR)));
-                            default -> slotMap.get(character).forEach(slot -> {
-                                DisplayItemStack displayItem = LushRewards.getInstance().getConfigManager().getItemTemplate(String.valueOf(character), module);
+                                    inventory.setItem(slot, displayItem.asItemStack(player, true));
 
-                                if (!displayItem.hasType()) {
-                                    displayItem = DisplayItemStack.builder(displayItem)
-                                        .setType(Material.RED_STAINED_GLASS_PANE)
-                                        .build();
+                                    addButton(slot, event -> {
+                                        String command = "dm open menu " + player.getName();
+                                        LushRewards.getMorePaperLib().scheduling().asyncScheduler().run(() -> {
+                                            Bukkit.dispatchCommand(Bukkit.getConsoleSender(), command);
+                                        });
+                                    });
+                                });
+                                case 'R' -> slotMap.get(character).forEach(slot -> {
+                                    if (rewardQueue.isEmpty()) {
+                                        return;
+                                    }
 
-                                    LushRewards.getInstance().getLogger().severe("Failed to display custom item-template '" + character + "' as it does not specify a valid material");
-                                }
+                                    Pair<PlaytimeRewardCollection, Integer> rewardPair = rewardQueue.poll();
+                                    PlaytimeRewardCollection reward = rewardPair.first();
+                                    int minutes = rewardPair.second();
+                                    int nextMinute = minutes + reward.getRepeatFrequency();
 
-                                inventory.setItem(slot, displayItem.asItemStack(player, true));
-                            });
+                                    if (reward.getRepeatFrequency() > 0 && nextMinute <= reward.getRepeatsUntil()) {
+                                        rewardQueue.add(new Pair<>(reward, nextMinute));
+                                    }
+
+                                    String itemTemplate;
+                                    if (minutes < lastCollectedPlaytime) {
+                                        itemTemplate = "collected-reward";
+                                    } else if (playtime > minutes) {
+                                        itemTemplate = "redeemable-reward";
+                                    } else {
+                                        itemTemplate = "default-reward";
+                                    }
+
+                                    DisplayItemStack.Builder displayItemBuilder = DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getCategoryTemplate(reward.getCategory()))
+                                            .overwrite(DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getItemTemplate(itemTemplate, module)))
+                                            .overwrite(DisplayItemStack.builder(reward.getDisplayItem()));
+
+                                    if (displayItemBuilder.getDisplayName() != null) {
+                                        displayItemBuilder.setDisplayName(displayItemBuilder.getDisplayName()
+                                                .replace("%minutes%", String.valueOf(minutes)));
+                                    }
+
+                                    if (displayItemBuilder.hasLore()) {
+                                        displayItemBuilder.setLore(displayItemBuilder.getLore().stream().map(line ->
+                                                line.replace("%minutes%", String.valueOf(minutes))
+                                        ).toList());
+                                    }
+
+                                    displayItemBuilder.parseColors(player);
+
+                                    if (module.hasClaimableRewards(player, playtimeTracker.getGlobalPlaytime())) {
+                                        addButton(slot, (event) -> {
+                                            // Gets clicked item and checks if it exists
+                                            ItemStack currItem = event.getCurrentItem();
+                                            if (currItem == null) {
+                                                return;
+                                            }
+
+                                            removeButton(slot);
+
+                                            DisplayItemStack.Builder collectedItemBuilder = DisplayItemStack.builder(currItem)
+                                                    .overwrite(DisplayItemStack.builder(LushRewards.getInstance().getConfigManager().getItemTemplate("collected-reward", module)));
+
+                                            if (collectedItemBuilder.getDisplayName() != null) {
+                                                collectedItemBuilder.setDisplayName(collectedItemBuilder.getDisplayName()
+                                                        .replace("%minutes%", String.valueOf(minutes)));
+                                            }
+
+                                            inventory.setItem(slot, collectedItemBuilder.build().asItemStack(player, true));
+
+                                            Debugger.sendDebugMessage("Starting reward process for " + player.getName(), Debugger.DebugMode.ALL);
+                                            if (module.hasClaimableRewards(player, playtimeTracker.getGlobalPlaytime())) {
+                                                module.claimRewards(player, playtimeTracker.getGlobalPlaytime());
+                                            }
+
+                                            refresh();
+                                        });
+                                    }
+
+                                    inventory.setItem(slot, displayItemBuilder.build().asItemStack(player, true));
+                                });
+                                case ' ' ->
+                                        slotMap.get(character).forEach(slot -> inventory.setItem(slot, new ItemStack(Material.AIR)));
+                                default -> slotMap.get(character).forEach(slot -> {
+                                    DisplayItemStack displayItem = LushRewards.getInstance().getConfigManager().getItemTemplate(String.valueOf(character), module);
+
+                                    if (!displayItem.hasType()) {
+                                        displayItem = DisplayItemStack.builder(displayItem)
+                                                .setType(Material.RED_STAINED_GLASS_PANE)
+                                                .build();
+
+                                        LushRewards.getInstance().getLogger().severe("Failed to display custom item-template '" + character + "' as it does not specify a valid material");
+                                    }
+
+                                    inventory.setItem(slot, displayItem.asItemStack(player, true));
+                                });
+                            }
                         }
-                    }
-                }));
+                    }));
         });
     }
 
