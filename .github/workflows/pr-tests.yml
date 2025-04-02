@@ -29,6 +29,6 @@ jobs:
 
       - name: Modify gradlew permissions
         run: chmod +x ./gradlew
-
+ 
       - name: Build plugin
         run: ./gradlew shadowJar
